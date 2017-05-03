@@ -154,7 +154,7 @@ export default class Head extends Component {
   
   componentWillUnmount() {
     const i = mounted.indexOf(this)
-    mounted.splice(index, 1)
+    if (~i) mounted.splice(i, 1)
     update()
   }
 
