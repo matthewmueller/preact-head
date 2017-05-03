@@ -1,7 +1,7 @@
 {
   "name": "preact-head",
   "description": "Declarative `<Head />` for preact",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "dependencies": {
     "preact": "^8.1.0",
     "preact-render-to-string": "^3.6.1"
