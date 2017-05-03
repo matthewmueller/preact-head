@@ -1,6 +1,5 @@
 /* @jsx h */
 import { h, render, Component, cloneElement } from 'preact'
-import stringify from 'preact-render-to-string'
 
 const DOMAttributeNames = {
   acceptCharset: 'accept-charset',
@@ -21,7 +20,7 @@ function reducer(components) {
   .filter(unique())
   .reverse()
   .map((c) => {
-    const className = (c.className ? c.className + ' ' : '') + 'next-head'
+    const className = (c.className ? c.className + ' ' : '') + 'preact-head'
     return cloneElement(c, { className })
   })
 }
@@ -44,7 +43,7 @@ function updateClient (head) {
 
 function updateElements (type, components) {
   const headEl = document.getElementsByTagName('head')[0]
-  const oldTags = Array.prototype.slice.call(headEl.querySelectorAll(type + '.next-head'))
+  const oldTags = Array.prototype.slice.call(headEl.querySelectorAll(type + '.preact-head'))
   const newTags = components.map(domify).filter((newTag) => {
     for (let i = 0, len = oldTags.length; i < len; i++) {
       const oldTag = oldTags[i]
@@ -140,7 +139,7 @@ export default class Head extends Component {
   static rewind () {
     const state = reducer(mounted.map(mount => mount.props))
     mounted = []
-    return state.map(stringify).join('')
+    return state
   }
 
   componentDidUpdate() {

@@ -43,6 +43,6 @@ class Sub extends Component {
 }
 
 console.log(render(<Demo />))
-console.log(Head.rewind());
+console.log(Head.rewind().map(render).join(''));
 console.log(render(<Demo />))
-console.log(Head.rewind());
+console.log(Head.rewind().map(render).join(''));

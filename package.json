@@ -3,14 +3,14 @@
   "description": "Declarative `<Head />` for preact",
   "version": "1.0.1",
   "dependencies": {
-    "preact": "^8.1.0",
-    "preact-render-to-string": "^3.6.1"
+    "preact": "^8.1.0"
   },
   "devDependencies": {
     "babel-cli": "^6.24.1",
     "babel-preset-env": "^1.4.0",
     "babel-preset-react": "^6.24.1",
     "babelify": "^7.3.0",
-    "budo": "^10.0.3"
+    "budo": "^10.0.3",
+    "preact-render-to-string": "^3.6.1"
   }
 }
