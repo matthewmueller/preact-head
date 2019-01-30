@@ -1,7 +1,7 @@
 {
   "name": "preact-head",
   "description": "Declarative `<Head />` for preact",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "main": "server.js",
   "browser": "browser.js",
   "files": [
@@ -26,5 +26,6 @@
     "rollup-plugin-commonjs": "9.2.0",
     "rollup-plugin-json": "3.1.0",
     "rollup-plugin-node-resolve": "4.0.0"
-  }
+  },
+  "license": "MIT"
 }
