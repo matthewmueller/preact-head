@@ -1,12 +1,12 @@
 {
   "name": "preact-head",
   "description": "Declarative `<Head />` for preact",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "main": "server.js",
   "browser": "browser.js",
   "files": [
-    "browser.js",
-    "server.js"
+    "/browser.js",
+    "/server.js"
   ],
   "peerDependencies": {
     "preact": "*"
