@@ -1,95 +1,226 @@
-/* @jsx h */
-import { h, render, Component, cloneElement } from 'preact'
+import { Component, cloneElement } from 'preact'
 
-const DOMAttributeNames = {
+const META_TYPES = ['name', 'httpEquiv', 'charSet', 'itemProp']
+const IS_BROWSER = typeof window !== 'undefined'
+const MARKER = 'elmo-head'
+
+const VALID_TYPES = {
+  title: true,
+  meta: true,
+  base: true,
+  link: true,
+  style: true,
+  script: true
+}
+
+const ATTR_MAP = {
   acceptCharset: 'accept-charset',
   className: 'class',
   htmlFor: 'for',
   httpEquiv: 'http-equiv'
 }
 
-const browser = typeof window !== 'undefined'
-let mounted = []
+// our mounted head components
+// reset on each rewind
+let HEAD_COMPONENTS = []
 
-function reducer(components) {
-  return components
-  .map(c => c.children)
-  .filter((c) => !!c)
-  .reduce((a, b) => a.concat(b), [])
-  .reverse()
-  .filter(unique())
-  .reverse()
-  .map((c) => {
-    const className = (c.className ? c.className + ' ' : '') + 'preact-head'
-    return cloneElement(c, { className })
-  })
+// only update on client-side
+function update() {
+  if (!IS_BROWSER) return
+  updateClient(HEAD_COMPONENTS)
 }
 
-function updateClient (head) {
-  const tags = {}
-  head.forEach((h) => {
-    const components = tags[h.nodeName] || []
-    components.push(h)
-    tags[h.nodeName] = components
-  })
+// client updates
+function updateClient(headComponents) {
+  const vnodes = flatten(headComponents)
+  const buckets = {}
 
-  updateTitle(tags.title ? tags.title[0] : null)
+  // buckets the vnodes
+  for (let i = 0; i < vnodes.length; i++) {
+    const vnode = vnodes[i]
+    const nodeName = vnode.nodeName
+    if (typeof nodeName !== 'string') continue
+    if (!VALID_TYPES[nodeName]) continue
+    const bucket = buckets[nodeName] || []
+    bucket.push(vnode)
+    buckets[nodeName] = bucket
+  }
 
-  const types = ['meta', 'base', 'link', 'style', 'script']
-  types.forEach((type) => {
-    updateElements(type, tags[type] || [])
-  })
+  // only write the title once
+  if (buckets.title) {
+    syncTitle(buckets.title[0])
+  }
+
+  // sync the vnodes to the DOM
+  for (let type in VALID_TYPES) {
+    if (type === 'title') continue
+    syncElements(type, buckets[type] || [])
+  }
 }
 
-function updateElements (type, components) {
-  const headEl = document.getElementsByTagName('head')[0]
-  const oldTags = Array.prototype.slice.call(headEl.querySelectorAll(type + '.preact-head'))
-  const newTags = components.map(domify).filter((newTag) => {
-    for (let i = 0, len = oldTags.length; i < len; i++) {
-      const oldTag = oldTags[i]
-      if (oldTag.isEqualNode(newTag)) {
-        oldTags.splice(i, 1)
-        return false
+// Map an array of Head components into VDOM nodes
+function flatten(headComponents) {
+  let children = []
+
+  for (let i = 0; i < headComponents.length; i++) {
+    const head = headComponents[i]
+    if (!head.props || !head.props.children) continue
+    children = children.concat(head.props.children || [])
+  }
+
+  // TODO: look back at next.js to see why we
+  // need to do this double reversal
+  // TODO: less fancy
+  children = children
+    .reverse()
+    .filter(uniqueHead())
+    .reverse()
+
+  const results = []
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i]
+    // strings are handled natively & pass functions through
+    if (typeof child === 'string' || !('nodeName' in child)) {
+      results.push(child)
+      continue
+    }
+    // ignore invalid head tags
+    if (!VALID_TYPES[child.nodeName]) {
+      continue
+    }
+
+    // mark the classname
+    const attrs = child.attributes || {}
+    const className = attrs.className ? `${attrs.className} ${MARKER}` : MARKER
+    results.push(cloneElement(child, { className }))
+  }
+
+  return results
+}
+
+// write the title to the DOM
+function syncTitle(vnode) {
+  const title = [].concat(vnode.children).join('')
+  if (title !== document.title) document.title = title
+}
+
+// sync elements with the DOM
+function syncElements(type, vnodes) {
+  const headElement = document.getElementsByTagName('head')[0]
+  const oldNodes = Array.prototype.slice.call(
+    headElement.querySelectorAll(type + '.' + MARKER)
+  )
+
+  const newNodes = []
+  for (let i = 0; i < vnodes.length; i++) {
+    newNodes.push(vnodeToDOMNode(vnodes[i]))
+  }
+
+  // loop over old nodes looking for old nodes to delete
+  const dels = []
+  for (let i = 0; i < oldNodes.length; i++) {
+    const oldNode = oldNodes[i]
+    let found = false
+    for (let j = 0; j < newNodes.length; j++) {
+      if (oldNode.isEqualNode(newNodes[j])) {
+        found = true
+        break
       }
     }
-    return true
-  })
-  
-  oldTags.forEach((t) => t.parentNode.removeChild(t))
-  newTags.forEach((t) => headEl.appendChild(t))
+    if (!found) {
+      dels.push(oldNode)
+    }
+  }
+
+  // loop over new nodes looking for new nodes to add
+  const adds = []
+  for (let i = 0; i < newNodes.length; i++) {
+    const newNode = newNodes[i]
+    let found = false
+    for (let j = 0; j < oldNodes.length; j++) {
+      if (newNode.isEqualNode(oldNodes[j])) {
+        found = true
+        break
+      }
+    }
+    if (!found) {
+      adds.push(newNode)
+    }
+  }
+
+  // remove the old nodes
+  for (let i = 0; i < dels.length; i++) {
+    const node = dels[i]
+    if (!node.parentNode) continue
+    node.parentNode.removeChild(node)
+  }
+
+  // add the new nodes
+  for (let i = 0; i < adds.length; i++) {
+    const node = adds[i]
+    headElement.appendChild(node)
+  }
 }
 
-function domify (component) {
-  const el = document.createElement(component.nodeName)
-  const attrs = component.attributes || {}
-  const children = component.children
-  
+// vnodeToDOMNode converts a virtual node into a DOM node
+function vnodeToDOMNode(vnode) {
+  const el = document.createElement(vnode.nodeName)
+  const attrs = vnode.attributes || {}
+  const children = vnode.children
   for (const p in attrs) {
     if (!attrs.hasOwnProperty(p)) continue
     if (p === 'dangerouslySetInnerHTML') continue
-
-    const attr = DOMAttributeNames[p] || p.toLowerCase()
+    const attr = ATTR_MAP[p] || p.toLowerCase()
     el.setAttribute(attr, attrs[p])
   }
-
   if (attrs['dangerouslySetInnerHTML']) {
     el.innerHTML = attrs['dangerouslySetInnerHTML'].__html || ''
   } else if (children) {
     el.textContent = typeof children === 'string' ? children : children.join('')
   }
-
   return el
 }
 
-const METATYPES = ['name', 'httpEquiv', 'charSet', 'itemProp']
+// All the heads are collected together
+export default class Head extends Component {
+  // server: this should get called before rewind
+  // client: doesn't matter where it is really
+  componentWillMount() {
+    HEAD_COMPONENTS.push(this)
+    update()
+  }
 
-// returns a function for filtering head child elements
-// which shouldn't be duplicated, like <title/>.
-function unique () {
+  static rewind() {
+    const children = flatten(HEAD_COMPONENTS)
+    // resets the HEAD_COMPONENTS
+    HEAD_COMPONENTS = []
+    return children
+  }
+
+  static unique() {
+    return uniqueHead
+  }
+
+  componentDidUpdate() {
+    update()
+  }
+
+  componentWillUnmount() {
+    const i = HEAD_COMPONENTS.indexOf(this)
+    if (~i) HEAD_COMPONENTS.splice(i, 1)
+    update()
+  }
+
+  render() {
+    return null
+  }
+}
+
+function uniqueHead() {
   const tags = []
   const metaTypes = []
   const metaCategories = {}
-  return (h) => {
+  return h => {
     switch (h.nodeName) {
       case 'title':
       case 'base':
@@ -97,8 +228,8 @@ function unique () {
         tags.push(h.nodeName)
         break
       case 'meta':
-        for (let i = 0, len = METATYPES.length; i < len; i++) {
-          const metatype = METATYPES[i]
+        for (let i = 0, len = META_TYPES.length; i < len; i++) {
+          const metatype = META_TYPES[i]
           if (!h.attributes.hasOwnProperty(metatype)) continue
           if (metatype === 'charSet') {
             if (~metaTypes.indexOf(metatype)) return false
@@ -114,50 +245,5 @@ function unique () {
         break
     }
     return true
-  }
-}
-
-function updateTitle (component) {
-  let title
-    if (component) {
-      const { children } = component
-      title = typeof children === 'string' ? children : children.join('')
-    } else {
-      title = ''
-    }
-    if (title !== document.title) {
-      document.title = title
-    }
-}
-
-function update() {
-  const state = reducer(mounted.map(mount => mount.props))
-  if (browser) updateClient(state)
-}
-
-export default class Head extends Component {
-  static rewind () {
-    const state = reducer(mounted.map(mount => mount.props))
-    mounted = []
-    return state
-  }
-
-  componentDidUpdate() {
-    update()
-  }
-  
-  componentWillMount() {
-    mounted.push(this)
-    update()
-  }
-  
-  componentWillUnmount() {
-    const i = mounted.indexOf(this)
-    if (~i) mounted.splice(i, 1)
-    update()
-  }
-
-  render() {
-    return null
   }
 }
